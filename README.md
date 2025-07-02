@@ -1,6 +1,6 @@
-# 🎉 Monthly Party Scheduler 🎉
+# 🎉 Party Scheduler 🎉
 
-Welcome to the **Monthly Party Scheduler**, a sleek and interactive web app that generates a year‑long party and lets you download it as a PDF! 🥳
+Welcome to the **Party Scheduler**, a sleek and interactive web app that generates a year‑long party and lets you download it as a PDF! 🥳
 ---
 
 ## 🚀 Features
