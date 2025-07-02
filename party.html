@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monthly Party Schedule</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for a nice font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Use a modern font */
+        body {
+            font-family: 'Inter', 'Cairo', sans-serif;
+            scroll-behavior: smooth;
+        }
+        /* Style for the individual person cards */
+        .person-card {
+            background-color: #1F2937;
+            border: 1.5px solid #38bdf8;
+            border-radius: 0.75rem;
+            box-shadow: 0 2px 8px 0 rgba(56,189,248,0.10), 0 1.5px 4px 0 rgba(0,0,0,0.10);
+            padding: 1rem 0.5rem 1rem 0.5rem;
+            margin: 0.4rem 0;
+            min-width: 120px;
+            min-height: 90px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-sizing: border-box;
+        }
+        .person-card:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 6px 18px 0 rgba(56, 189, 248, 0.18), 0 2px 8px 0 rgba(0,0,0,0.12);
+        }
+        .person-id {
+            background-color: #374151;
+            color: #F9FAFB;
+            font-weight: bold;
+            font-size: 1rem;
+            padding: 0.12rem 0.7rem;
+            border-radius: 0.4rem;
+            margin-bottom: 0.2rem;
+        }
+        .person-category {
+            font-size: 0.95rem;
+            font-weight: 700;
+            margin-bottom: 0.2rem;
+            padding: 0.12rem 0.6rem;
+            border-radius: 0.4rem;
+            color: #fff;
+        }
+        .person-age-young {
+            background-color: #1D4ED8;
+            color: white;
+            font-size: 0.9rem;
+            font-weight: 600;
+            padding: 0.12rem 0.6rem;
+            border-radius: 0.4rem;
+        }
+        .person-age-adult {
+            background-color: #BE123C;
+            color: white;
+            font-size: 0.9rem;
+            font-weight: 600;
+            padding: 0.12rem 0.6rem;
+            border-radius: 0.4rem;
+        }
+        .person-category.c {
+            background-color: #059669;
+        }
+        .person-category.t {
+            background-color: #7c3aed;
+        }
+        .person-category.other {
+            background-color: #f59e42;
+        }
+        /* Prevent text selection for PDF */
+        .no-select {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+        /* Page break for PDF */
+        .pdf-page-break {
+            page-break-after: always;
+            break-after: page;
+        }
+        /* Grid for person cards */
+        .person-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 0.7rem;
+        }
+        /* Input form styling as table */
+        .input-form-bg {
+            background: linear-gradient(120deg, #0ea5e9 0%, #1e293b 100%);
+            border-radius: 1.5rem;
+            box-shadow: 0 4px 24px 0 rgba(56,189,248,0.10);
+            padding: 2.5rem 1.5rem 2rem 1.5rem;
+            margin-bottom: 2rem;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .input-form-bg label {
+            color: #fff;
+            font-weight: 600;
+        }
+        .input-form-bg input, .input-form-bg select {
+            border-radius: 0.5rem;
+            border: 1px solid #38bdf8;
+            padding: 0.5rem 1rem;
+            margin-bottom: 1rem;
+            width: 100%;
+            font-size: 1rem;
+        }
+        .input-form-bg button {
+            background: #06b6d4;
+            color: #fff;
+            font-weight: bold;
+            border: none;
+            border-radius: 0.5rem;
+            padding: 0.7rem 2rem;
+            font-size: 1.1rem;
+            margin-top: 1rem;
+            transition: background 0.2s;
+        }
+        .input-form-bg button:hover {
+            background: #0ea5e9;
+        }
+        /* Table view for PDF and on-screen */
+        .schedule-table-container {
+            margin: 2rem auto;
+            max-width: 900px;
+            background: #181e29;
+            border-radius: 1rem;
+            box-shadow: 0 2px 12px 0 rgba(56,189,248,0.10);
+            padding: 1.5rem 1rem;
+        }
+        .schedule-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #181e29;
+            color: #e0e7ef;
+            font-size: 1rem;
+        }
+        .schedule-table th, .schedule-table td {
+            border: 1px solid #38bdf8;
+            padding: 0.5rem 0.7rem;
+            text-align: center;
+        }
+        .schedule-table th {
+            background: #0ea5e9;
+            color: #fff;
+            font-size: 1.1rem;
+        }
+        .schedule-table tr:nth-child(even) {
+            background: #23272f;
+        }
+        .toggle-btns {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+        .toggle-btns button {
+            background: #0ea5e9;
+            color: #fff;
+            font-weight: 600;
+            border: none;
+            border-radius: 0.5rem;
+            padding: 0.5rem 1.5rem;
+            margin: 0 0.5rem;
+            font-size: 1rem;
+            transition: background 0.2s;
+        }
+        .toggle-btns button.active, .toggle-btns button:hover {
+            background: #38bdf8;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <!-- Header Section -->
+        <header class="text-center mb-10">
+            <h1 class="text-4xl md:text-5xl font-bold text-white mb-2">Monthly Party Schedule</h1>
+            <p class="text-lg text-gray-400">x</p>
+        </header>
+
+        <!-- Input Form -->
+        <form id="input-form" class="input-form-bg">
+            <div class="mb-4">
+                <label for="numCategories">Number of categories (e.g. 2 for C, T):</label>
+                <input type="number" id="numCategories" name="numCategories" min="2" max="5" value="2" required />
+            </div>
+            <div id="category-names-container" class="mb-4"></div>
+            <div class="mb-4">
+                <label for="totalPeople">Total number of people:</label>
+                <input type="number" id="totalPeople" name="totalPeople" min="2" value="40" required />
+            </div>
+            <div id="category-party-counts-container" class="mb-4"></div>
+            <button type="submit">Generate Schedule</button>
+        </form>
+
+        <!-- Download PDF Button -->
+        <div class="text-center mb-6" id="pdf-btn-container" style="display:none;">
+            <button id="download-pdf" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-6 rounded-lg shadow-lg transition">Download PDF</button>
+        </div>
+
+        <!-- Toggle View Buttons -->
+        <div class="toggle-btns" id="toggle-btns" style="display:none;">
+            <button id="view-cards" class="active">View as Cards</button>
+            <button id="view-table">View as Table</button>
+        </div>
+
+        <!-- Table view for PDF/export and on-screen -->
+        <div id="schedule-table-container" class="schedule-table-container" style="display:none;"></div>
+
+        <!-- Schedule will be rendered here by JavaScript -->
+        <main id="schedule-container" class="space-y-12 no-select">
+            <!-- Loading state -->
+            <div id="loading" class="text-center">
+                <p class="text-2xl font-semibold animate-pulse"></p>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="text-center mt-12 py-6 border-t border-gray-800">
+            <p class="text-gray-500">x Refresh the page for a new schedule</p>
+        </footer>
+    </div>
+
+    <!-- html2pdf.js for PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <script>
+        // --- Dynamic Input Form Logic ---
+        const categoryColors = ["c", "t", "other", "other", "other"];
+        function renderCategoryInputs(num) {
+            const container = document.getElementById('category-names-container');
+            container.innerHTML = '';
+            for (let i = 0; i < num; i++) {
+                container.innerHTML += `<label>Category ${i+1} Name:</label><input type="text" name="categoryName${i}" value="${String.fromCharCode(67+i)}" required />`;
+            }
+            renderPartyCountsInputs(num);
+        }
+        function renderPartyCountsInputs(num) {
+            const container = document.getElementById('category-party-counts-container');
+            container.innerHTML = '';
+            for (let i = 0; i < num; i++) {
+                container.innerHTML += `<label>How many from category ${String.fromCharCode(67+i)} per party?</label><input type="number" name="partyCount${i}" min="1" value="10" required />`;
+            }
+        }
+        document.getElementById('numCategories').addEventListener('input', function(e) {
+            let num = parseInt(e.target.value);
+            if (isNaN(num) || num < 2) num = 2;
+            if (num > 5) num = 5;
+            renderCategoryInputs(num);
+        });
+        renderCategoryInputs(2);
+
+        // --- SCHEDULING LOGIC ---
+
+        // Real month names
+        const MONTH_NAMES = [
+            'January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'
+        ];
+
+        function createPeople(categories, totalPeople) {
+            // Distribute people as evenly as possible among categories
+            const people = [];
+            let perCat = Math.floor(totalPeople / categories.length);
+            let remainder = totalPeople % categories.length;
+            let idx = 0;
+            for (let c = 0; c < categories.length; c++) {
+                let count = perCat + (remainder > 0 ? 1 : 0);
+                if (remainder > 0) remainder--;
+                for (let i = 1; i <= count; i++) {
+                    people.push({
+                        id: `${categories[c]}${String(i).padStart(3, '0')}`,
+                        category: categories[c],
+                        age: Math.random() < 0.5 ? 'Young' : 'Adult'
+                    });
+                }
+            }
+            return people;
+        }
+
+        function generateYearlySchedule(people, categories, partyCounts) {
+            // For each month, select the required number from each category, ensuring even participation
+            // Try to maximize unique meetings between categories
+            // For 2+ categories, ensure every person from each category meets every person from every other category at least once (as much as possible)
+            // We'll use a greedy approach
+            // Track participation
+            const participation = {};
+            people.forEach(p => participation[p.id] = 0);
+            // Track meetings: {id: Set of met ids}
+            const meetings = {};
+            people.forEach(p => meetings[p.id] = new Set());
+            const yearlySchedule = {};
+            for (let m = 0; m < 12; m++) {
+                let monthPeople = [];
+                // For each category, pick the required number with least participation
+                for (let c = 0; c < categories.length; c++) {
+                    const catPeople = people.filter(p => p.category === categories[c]);
+                    const sorted = [...catPeople].sort((a, b) => participation[a.id] - participation[b.id]);
+                    monthPeople = monthPeople.concat(sorted.slice(0, partyCounts[c]));
+                }
+                // Shuffle for randomness
+                for (let i = monthPeople.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [monthPeople[i], monthPeople[j]] = [monthPeople[j], monthPeople[i]];
+                }
+                // Update participation
+                monthPeople.forEach(p => participation[p.id]++);
+                // Update meetings
+                for (let i = 0; i < monthPeople.length; i++) {
+                    for (let j = 0; j < monthPeople.length; j++) {
+                        if (i !== j) meetings[monthPeople[i].id].add(monthPeople[j].id);
+                    }
+                }
+                yearlySchedule[MONTH_NAMES[m]] = monthPeople.map(p => ({...p}));
+            }
+            return yearlySchedule;
+        }
+
+        /**
+         * Helper to get color class for a category
+         */
+        function getCategoryClass(cat, idx) {
+            if (cat === 'C') return 'c';
+            if (cat === 'T') return 't';
+            return 'other';
+        }
+
+        /**
+         * Renders the generated schedule into the HTML document.
+         * Each person is displayed in their own card, in a grid. Each month is on a separate page for PDF.
+         */
+        function renderSchedule(schedule, categories, months, mode = 'cards') {
+            const container = document.getElementById('schedule-container');
+            container.innerHTML = '';
+            document.getElementById('schedule-table-container').style.display = 'none';
+            if (mode === 'table') {
+                renderScheduleTable(schedule, categories, months);
+                return;
+            }
+            for (const monthName in schedule) {
+                const peopleList = schedule[monthName];
+                // Sort by category then ID for a clean look
+                peopleList.sort((a, b) => (a.category === b.category ? a.id.localeCompare(b.id) : a.category.localeCompare(b.category)));
+                const monthDiv = document.createElement('div');
+                monthDiv.className = 'month-section bg-gray-800/50 rounded-xl p-4 md:p-6 pdf-page-break';
+                const monthTitle = document.createElement('h2');
+                monthTitle.className = 'text-3xl font-bold text-cyan-400 mb-6 text-center';
+                monthTitle.textContent = monthName;
+                monthDiv.appendChild(monthTitle);
+                // Grid for all person cards
+                const personGrid = document.createElement('div');
+                personGrid.className = 'person-grid';
+                peopleList.forEach(person => {
+                    const personCard = document.createElement('div');
+                    personCard.className = 'person-card';
+                    const idBadge = document.createElement('div');
+                    idBadge.className = 'person-id';
+                    idBadge.textContent = person.id;
+                    const catIdx = categories.indexOf(person.category);
+                    const categoryBadge = document.createElement('div');
+                    categoryBadge.className = 'person-category ' + (catIdx === 0 ? 'c' : catIdx === 1 ? 't' : 'other');
+                    categoryBadge.textContent = 'Category ' + person.category;
+                    const ageBadge = document.createElement('div');
+                    ageBadge.className = person.age === 'Young' ? 'person-age-young' : 'person-age-adult';
+                    ageBadge.textContent = person.age;
+                    personCard.appendChild(idBadge);
+                    personCard.appendChild(categoryBadge);
+                    personCard.appendChild(ageBadge);
+                    personGrid.appendChild(personCard);
+                });
+                monthDiv.appendChild(personGrid);
+                container.appendChild(monthDiv);
+            }
+        }
+
+        // Render as table for PDF/export and on-screen
+        function renderScheduleTable(schedule, categories, months) {
+            const tableContainer = document.getElementById('schedule-table-container');
+            tableContainer.innerHTML = '';
+            let html = '';
+            months.forEach(monthName => {
+                html += `<h2 style="margin:1.5rem 0 0.5rem 0;text-align:center;font-size:1.5rem;color:#38bdf8;">${monthName}</h2>`;
+                html += `<table class="schedule-table pdf-page-break"><thead><tr><th>Month</th><th>Person ID</th><th>Category</th><th>Age</th></tr></thead><tbody>`;
+                (schedule[monthName] || []).forEach(person => {
+                    html += `<tr><td>${monthName}</td><td>${person.id}</td><td>${person.category}</td><td>${person.age}</td></tr>`;
+                });
+                html += '</tbody></table>';
+            });
+            tableContainer.innerHTML = html;
+            tableContainer.style.display = '';
+            document.getElementById('schedule-container').innerHTML = '';
+        }
+
+        // --- Main Execution ---
+        document.getElementById('input-form').onsubmit = function(e) {
+            e.preventDefault();
+            // Get user input
+            const numCategories = parseInt(document.getElementById('numCategories').value);
+            const categoryNames = [];
+            for (let i = 0; i < numCategories; i++) {
+                categoryNames.push(document.querySelector(`[name=categoryName${i}]`).value.trim().toUpperCase());
+            }
+            const totalPeople = parseInt(document.getElementById('totalPeople').value);
+            const partyCounts = [];
+            for (let i = 0; i < numCategories; i++) {
+                partyCounts.push(parseInt(document.querySelector(`[name=partyCount${i}]`).value));
+            }
+            // Hide form and show PDF button and toggle
+            document.getElementById('input-form').style.display = 'none';
+            document.getElementById('pdf-btn-container').style.display = '';
+            document.getElementById('toggle-btns').style.display = '';
+            // Generate and render schedule
+            const people = createPeople(categoryNames, totalPeople);
+            // Calculate months to use (up to 12)
+            const months = MONTH_NAMES.slice(0, 12);
+            // Ensure the number of people per month matches exactly what the user specified
+            function fixPartyCounts(partyCounts, totalPeople) {
+                let sum = partyCounts.reduce((a, b) => a + b, 0);
+                if (sum > totalPeople) {
+                    // Reduce from the largest
+                    let idx = partyCounts.indexOf(Math.max(...partyCounts));
+                    partyCounts[idx] -= (sum - totalPeople);
+                } else if (sum < totalPeople) {
+                    // Add to the smallest
+                    let idx = partyCounts.indexOf(Math.min(...partyCounts));
+                    partyCounts[idx] += (totalPeople - sum);
+                }
+                return partyCounts;
+            }
+            fixPartyCounts(partyCounts, totalPeople);
+            const schedule = generateYearlySchedule(people, categoryNames, partyCounts);
+            renderSchedule(schedule, categoryNames, months, 'cards');
+            // Toggle view logic
+            document.getElementById('view-cards').onclick = function() {
+                this.classList.add('active');
+                document.getElementById('view-table').classList.remove('active');
+                renderSchedule(schedule, categoryNames, months, 'cards');
+            };
+            document.getElementById('view-table').onclick = function() {
+                this.classList.add('active');
+                document.getElementById('view-cards').classList.remove('active');
+                renderSchedule(schedule, categoryNames, months, 'table');
+            };
+            // Bind PDF button (always export table view)
+            setTimeout(() => {
+                const pdfBtn = document.getElementById('download-pdf');
+                if (pdfBtn) {
+                    pdfBtn.onclick = function() {
+                        // Always export the table view
+                        renderScheduleTable(schedule, categoryNames, months);
+                        const element = document.getElementById('schedule-table-container');
+                        const opt = {
+                            margin:       0.2,
+                            filename:     'party-schedule.pdf',
+                            image:        { type: 'jpeg', quality: 0.98 },
+                            html2canvas:  { scale: 2, useCORS: true },
+                            jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' },
+                            pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+                        };
+                        html2pdf().set(opt).from(element).save();
+                    };
+                }
+            }, 200);
+        };
+    </script>
+</body>
+</html>
