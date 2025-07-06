@@ -70,7 +70,12 @@
             margin-left: auto;
             margin-right: auto;
         }
-        .input-form-bg label { color: #fff; font-weight: 600; }
+        .input-form-bg label { 
+            color: #fff; 
+            font-weight: 600; 
+            display: block;
+            margin-bottom: 0.5rem;
+        }
         .input-form-bg input, .input-form-bg select {
             border-radius: 0.5rem;
             border: 1px solid #38bdf8;
@@ -79,6 +84,7 @@
             width: 100%;
             font-size: 1rem;
             color: #111827;
+            box-sizing: border-box;
         }
         .input-form-bg button {
             background: #06b6d4;
@@ -93,6 +99,10 @@
             cursor: pointer;
         }
         .input-form-bg button:hover { background: #0ea5e9; }
+        .input-form-bg button:disabled { 
+            background: #6b7280; 
+            cursor: not-allowed; 
+        }
         .schedule-table-container {
             margin: 2rem auto;
             max-width: 900px;
@@ -133,6 +143,32 @@
             cursor: pointer;
         }
         .toggle-btns button.active, .toggle-btns button:hover { background: #38bdf8; }
+        .error-message {
+            color: #ef4444;
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+            display: none;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            color: #38bdf8;
+            font-size: 1.1rem;
+            margin: 2rem 0;
+        }
+        .reset-btn {
+            background: #ef4444;
+            color: #fff;
+            font-weight: bold;
+            border: none;
+            border-radius: 0.5rem;
+            padding: 0.5rem 1.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-left: 1rem;
+        }
+        .reset-btn:hover { background: #dc2626; }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-200">
@@ -145,21 +181,31 @@
 
         <form id="input-form" class="input-form-bg">
             <div class="mb-4">
-                <label for="numCategories">Number of Categories</label>
+                <label for="numCategories">Number of Categories (2-5)</label>
                 <input type="number" id="numCategories" name="numCategories" min="2" max="5" value="2" required />
+                <div class="error-message" id="numCategories-error"></div>
             </div>
             <div id="category-names-container" class="mb-4"></div>
             <div class="mb-4">
-                <label for="totalPeople">Total Number of People</label>
-                <input type="number" id="totalPeople" name="totalPeople" min="2" value="40" required />
+                <label for="totalPeople">Total Number of People (6-500)</label>
+                <input type="number" id="totalPeople" name="totalPeople" min="6" max="500" value="40" required />
+                <div class="error-message" id="totalPeople-error"></div>
             </div>
             <div class="mb-4">
-                <label for="numHouses">Number of Houses</label>
-                <input type="number" id="numHouses" name="numHouses" min="1" value="5" required />
+                <label for="numHouses">Number of Houses (1-20)</label>
+                <input type="number" id="numHouses" name="numHouses" min="1" max="20" value="5" required />
+                <div class="error-message" id="numHouses-error"></div>
             </div>
             <div id="category-party-counts-container" class="mb-4"></div>
-            <button type="submit">Generate Schedule</button>
+            <div class="text-center">
+                <button type="submit" id="generate-btn">Generate Schedule</button>
+                <button type="button" id="reset-btn" class="reset-btn" style="display:none;">Reset</button>
+            </div>
         </form>
+
+        <div class="loading" id="loading">
+            <div>Generating schedule...</div>
+        </div>
 
         <div class="text-center mb-6" id="pdf-btn-container" style="display:none;">
             <button id="download-pdf" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-6 rounded-lg shadow-lg transition">Download as PDF</button>
@@ -175,18 +221,81 @@
         <main id="schedule-container" class="space-y-12 no-select"></main>
 
         <footer class="text-center mt-12 py-6 border-t border-gray-800">
-            <p class="text-gray-500">Mr. Robot</p>
+            <p class="text-gray-500">Party Schedule Generator</p>
         </footer>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <script>
+        // Global state management
+        let currentSchedule = null;
+        let currentCategories = [];
+        let currentMonths = [];
+        let currentView = 'cards';
+
+        // Input validation functions
+        function validateInput(value, min, max, fieldName) {
+            const num = parseInt(value);
+            if (isNaN(num)) {
+                throw new Error(`${fieldName} must be a valid number`);
+            }
+            if (num < min || num > max) {
+                throw new Error(`${fieldName} must be between ${min} and ${max}`);
+            }
+            return num;
+        }
+
+        function sanitizeString(str) {
+            return str.replace(/[<>'"&]/g, '').trim().toUpperCase();
+        }
+
+        function validateCategoryName(name) {
+            const sanitized = sanitizeString(name);
+            if (sanitized.length === 0) {
+                throw new Error('Category name cannot be empty');
+            }
+            if (sanitized.length > 10) {
+                throw new Error('Category name must be 10 characters or less');
+            }
+            if (!/^[A-Z0-9]+$/.test(sanitized)) {
+                throw new Error('Category name can only contain letters and numbers');
+            }
+            return sanitized;
+        }
+
+        function showError(fieldId, message) {
+            const errorElement = document.getElementById(fieldId + '-error');
+            if (errorElement) {
+                errorElement.textContent = message;
+                errorElement.style.display = 'block';
+            }
+        }
+
+        function hideError(fieldId) {
+            const errorElement = document.getElementById(fieldId + '-error');
+            if (errorElement) {
+                errorElement.style.display = 'none';
+            }
+        }
+
+        function hideAllErrors() {
+            const errorElements = document.querySelectorAll('.error-message');
+            errorElements.forEach(el => el.style.display = 'none');
+        }
+
         function renderCategoryInputs(num) {
             const container = document.getElementById('category-names-container');
             container.innerHTML = '';
             for (let i = 0; i < num; i++) {
-                container.innerHTML += `<label for="categoryName${i}">Category ${i+1} Name:</label><input type="text" id="categoryName${i}" name="categoryName${i}" value="${String.fromCharCode(65+i)}" required />`;
+                const div = document.createElement('div');
+                div.className = 'mb-4';
+                div.innerHTML = `
+                    <label for="categoryName${i}">Category ${i+1} Name (letters/numbers only):</label>
+                    <input type="text" id="categoryName${i}" name="categoryName${i}" value="${String.fromCharCode(65+i)}" required maxlength="10" />
+                    <div class="error-message" id="categoryName${i}-error"></div>
+                `;
+                container.appendChild(div);
             }
             renderPartyCountsInputs(num);
         }
@@ -195,16 +304,47 @@
             const container = document.getElementById('category-party-counts-container');
             container.innerHTML = '';
             for (let i = 0; i < num; i++) {
-                container.innerHTML += `<label for="partyCount${i}">How many from Category ${String.fromCharCode(65+i)} per party?</label><input type="number" id="partyCount${i}" name="partyCount${i}" min="1" value="10" required />`;
+                const div = document.createElement('div');
+                div.className = 'mb-4';
+                div.innerHTML = `
+                    <label for="partyCount${i}">How many from Category ${String.fromCharCode(65+i)} per party? (1-50)</label>
+                    <input type="number" id="partyCount${i}" name="partyCount${i}" min="1" max="50" value="10" required />
+                    <div class="error-message" id="partyCount${i}-error"></div>
+                `;
+                container.appendChild(div);
             }
         }
 
+        // Event listeners for input validation
         document.getElementById('numCategories').addEventListener('input', function(e) {
-            let num = parseInt(e.target.value);
-            if (isNaN(num) || num < 2) num = 2;
-            if (num > 5) num = 5;
-            renderCategoryInputs(num);
+            try {
+                hideError('numCategories');
+                const num = validateInput(e.target.value, 2, 5, 'Number of Categories');
+                renderCategoryInputs(num);
+            } catch (error) {
+                showError('numCategories', error.message);
+            }
         });
+
+        document.getElementById('totalPeople').addEventListener('input', function(e) {
+            try {
+                hideError('totalPeople');
+                validateInput(e.target.value, 6, 500, 'Total People');
+            } catch (error) {
+                showError('totalPeople', error.message);
+            }
+        });
+
+        document.getElementById('numHouses').addEventListener('input', function(e) {
+            try {
+                hideError('numHouses');
+                validateInput(e.target.value, 1, 20, 'Number of Houses');
+            } catch (error) {
+                showError('numHouses', error.message);
+            }
+        });
+
+        // Initialize form
         renderCategoryInputs(2);
 
         const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -213,9 +353,11 @@
             const people = [];
             let perCat = Math.floor(totalPeople / categories.length);
             let remainder = totalPeople % categories.length;
+            
             for (let c = 0; c < categories.length; c++) {
                 let count = perCat + (remainder > 0 ? 1 : 0);
                 if (remainder > 0) remainder--;
+                
                 for (let i = 1; i <= count; i++) {
                     people.push({
                         id: `${categories[c]}${String(i).padStart(3, '0')}`,
@@ -234,52 +376,64 @@
             return houses;
         }
 
+        function shuffleArray(array) {
+            const shuffled = [...array];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
+
         function generateYearlySchedule(people, categories, partyCounts, houses) {
             const yearlySchedule = {};
             const peopleByCategory = {};
             const categoryPointers = {};
 
+            // Initialize category data
             categories.forEach(cat => {
                 const catPeople = people.filter(p => p.category === cat);
-                for (let i = catPeople.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [catPeople[i], catPeople[j]] = [catPeople[j], catPeople[i]];
-                }
-                peopleByCategory[cat] = catPeople;
+                peopleByCategory[cat] = shuffleArray(catPeople);
                 categoryPointers[cat] = 0;
             });
 
-            const shuffledHouses = [...houses].sort(() => 0.5 - Math.random());
+            const shuffledHouses = shuffleArray(houses);
 
+            // Generate schedule for each month
             for (let m = 0; m < 12; m++) {
                 let monthPeople = [];
 
-                for (const categoryName of categories) {
+                // Select people from each category
+                for (let catIndex = 0; catIndex < categories.length; catIndex++) {
+                    const categoryName = categories[catIndex];
                     const catPeople = peopleByCategory[categoryName];
-                    const countToSelect = partyCounts[categories.indexOf(categoryName)];
+                    const countToSelect = partyCounts[catIndex];
                     const currentPointer = categoryPointers[categoryName];
+                    
                     if (catPeople.length === 0) continue;
-                    let selectedForMonth = [];
+                    
+                    // Select required number of people from this category
                     for (let i = 0; i < countToSelect; i++) {
                         const personIndex = (currentPointer + i) % catPeople.length;
-                        selectedForMonth.push(catPeople[personIndex]);
+                        monthPeople.push({ ...catPeople[personIndex] });
                     }
-                    monthPeople = monthPeople.concat(selectedForMonth);
+                    
+                    // Update pointer for next month
                     categoryPointers[categoryName] = (currentPointer + countToSelect) % catPeople.length;
                 }
 
+                // Assign house for this month
                 const assignedHouse = shuffledHouses[m % shuffledHouses.length];
                 
-                for (let i = monthPeople.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [monthPeople[i], monthPeople[j]] = [monthPeople[j], monthPeople[i]];
-                }
+                // Shuffle people within the month
+                monthPeople = shuffleArray(monthPeople);
                 
                 yearlySchedule[MONTH_NAMES[m]] = {
-                    people: monthPeople.map(p => ({ ...p })),
-                    house: assignedHouse
+                    people: monthPeople,
+                    house: { ...assignedHouse }
                 };
             }
+            
             return yearlySchedule;
         }
 
@@ -292,22 +446,34 @@
         
         function renderSchedule(schedule, categories, months, mode = 'cards') {
             const container = document.getElementById('schedule-container');
-            container.innerHTML = '';
-            document.getElementById('schedule-table-container').style.display = 'none';
-
+            const tableContainer = document.getElementById('schedule-table-container');
+            
             if (mode === 'table') {
                 renderScheduleTable(schedule, categories, months);
+                container.style.display = 'none';
+                tableContainer.style.display = 'block';
                 return;
             }
 
+            // Cards view
+            container.innerHTML = '';
             container.style.display = 'block';
-            for (const monthName of months) {
+            tableContainer.style.display = 'none';
+
+            months.forEach(monthName => {
                 const monthData = schedule[monthName];
-                if (!monthData) continue;
-                const peopleList = monthData.people;
+                if (!monthData || !monthData.people) return;
+                
+                const peopleList = [...monthData.people];
                 const assignedHouse = monthData.house;
 
-                peopleList.sort((a, b) => (a.category === b.category ? a.id.localeCompare(b.id) : a.category.localeCompare(b.category)));
+                // Sort people by category then by ID
+                peopleList.sort((a, b) => {
+                    if (a.category === b.category) {
+                        return a.id.localeCompare(b.id);
+                    }
+                    return a.category.localeCompare(b.category);
+                });
                 
                 const monthDiv = document.createElement('div');
                 monthDiv.className = 'month-section bg-gray-800/50 rounded-xl p-4 md:p-6 pdf-page-break';
@@ -328,12 +494,15 @@
                 peopleList.forEach(person => {
                     const personCard = document.createElement('div');
                     personCard.className = 'person-card';
+                    
                     const idBadge = document.createElement('div');
                     idBadge.className = 'person-id';
                     idBadge.textContent = person.id;
+                    
                     const categoryBadge = document.createElement('div');
                     categoryBadge.className = 'person-category ' + getCategoryClass(person.category, categories);
                     categoryBadge.textContent = 'Category ' + person.category;
+                    
                     personCard.appendChild(idBadge);
                     personCard.appendChild(categoryBadge);
                     personGrid.appendChild(personCard);
@@ -341,18 +510,27 @@
 
                 monthDiv.appendChild(personGrid);
                 container.appendChild(monthDiv);
-            }
+            });
         }
         
         function renderScheduleTable(schedule, categories, months) {
             const tableContainer = document.getElementById('schedule-table-container');
             let html = '';
+            
             months.forEach(monthName => {
                 const monthData = schedule[monthName];
-                if (!monthData || !monthData.people || !monthData.people.length === 0) return;
+                if (!monthData || !monthData.people || monthData.people.length === 0) return;
 
-                const peopleList = monthData.people;
+                const peopleList = [...monthData.people];
                 const assignedHouse = monthData.house;
+                
+                // Sort people by category then by ID
+                peopleList.sort((a, b) => {
+                    if (a.category === b.category) {
+                        return a.id.localeCompare(b.id);
+                    }
+                    return a.category.localeCompare(b.category);
+                });
                 
                 html += `<h2 style="margin:1.5rem 0 0.5rem 0;text-align:center;font-size:1.5rem;color:#38bdf8;">${monthName}</h2>`;
                 html += `<table class="schedule-table pdf-page-break"><thead><tr><th>Host House</th><th>Person ID</th><th>Category</th></tr></thead><tbody>`;
@@ -366,76 +544,170 @@
                 });
                 html += '</tbody></table>';
             });
+            
             tableContainer.innerHTML = html;
-            tableContainer.style.display = 'block';
-            document.getElementById('schedule-container').style.display = 'none';
         }
 
-        document.getElementById('input-form').onsubmit = function(e) {
-            e.preventDefault();
-            const numCategories = parseInt(document.getElementById('numCategories').value);
-            const categoryNames = [];
-            for (let i = 0; i < numCategories; i++) {
-                categoryNames.push(document.querySelector(`[name=categoryName${i}]`).value.trim().toUpperCase());
-            }
-            const totalPeople = parseInt(document.getElementById('totalPeople').value);
-            const partyCounts = [];
-            for (let i = 0; i < numCategories; i++) {
-                partyCounts.push(parseInt(document.querySelector(`[name=partyCount${i}]`).value));
-            }
-            const numHouses = parseInt(document.getElementById('numHouses').value);
+        // View toggle functions
+        function switchToCardsView() {
+            if (currentView === 'cards') return;
+            currentView = 'cards';
+            document.getElementById('view-cards').classList.add('active');
+            document.getElementById('view-table').classList.remove('active');
+            renderSchedule(currentSchedule, currentCategories, currentMonths, 'cards');
+        }
 
-            document.getElementById('input-form').style.display = 'none';
-            document.getElementById('pdf-btn-container').style.display = 'block';
-            document.getElementById('toggle-btns').style.display = 'block';
+        function switchToTableView() {
+            if (currentView === 'table') return;
+            currentView = 'table';
+            document.getElementById('view-table').classList.add('active');
+            document.getElementById('view-cards').classList.remove('active');
+            renderSchedule(currentSchedule, currentCategories, currentMonths, 'table');
+        }
+
+        // PDF generation
+        function generatePDF() {
+            const wasOnCardsView = currentView === 'cards';
             
-            const people = createPeople(categoryNames, totalPeople);
-            const houses = createHouses(numHouses);
-            const months = MONTH_NAMES.slice(0, 12);
-            const schedule = generateYearlySchedule(people, categoryNames, partyCounts, houses);
-            
-            renderSchedule(schedule, categoryNames, months, 'cards');
+            // Switch to table view for PDF
+            if (wasOnCardsView) {
+                renderScheduleTable(currentSchedule, currentCategories, currentMonths);
+            }
 
-            let currentView = 'cards';
-
-            document.getElementById('view-cards').onclick = function() {
-                if (currentView === 'cards') return;
-                currentView = 'cards';
-                this.classList.add('active');
-                document.getElementById('view-table').classList.remove('active');
-                renderSchedule(schedule, categoryNames, months, 'cards');
-            };
-
-            document.getElementById('view-table').onclick = function() {
-                if (currentView === 'table') return;
-                currentView = 'table';
-                this.classList.add('active');
-                document.getElementById('view-cards').classList.remove('active');
-                renderSchedule(schedule, categoryNames, months, 'table');
+            const element = document.getElementById('schedule-table-container');
+            const opt = {
+                margin: 0.2,
+                filename: 'party-schedule.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
+                pagebreak: { mode: ['css', 'legacy'] }
             };
             
-            document.getElementById('download-pdf').onclick = function() {
-                const wasOnCardsView = currentView === 'cards';
-                if(wasOnCardsView) {
-                    renderScheduleTable(schedule, categoryNames, months);
+            html2pdf().set(opt).from(element).save().then(() => {
+                // Switch back to original view
+                if (wasOnCardsView) {
+                    renderSchedule(currentSchedule, currentCategories, currentMonths, 'cards');
                 }
+            });
+        }
 
-                const element = document.getElementById('schedule-table-container');
-                const opt = {
-                    margin: 0.2,
-                    filename: 'party-schedule.pdf',
-                    image: { type: 'jpeg', quality: 0.98 },
-                    html2canvas: { scale: 2, useCORS: true },
-                    jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
-                    pagebreak: { mode: ['css', 'legacy'] }
-                };
-                html2pdf().set(opt).from(element).save().then(() => {
-                    if(wasOnCardsView) {
-                         renderSchedule(schedule, categoryNames, months, 'cards');
+        // Reset function
+        function resetForm() {
+            document.getElementById('input-form').style.display = 'block';
+            document.getElementById('pdf-btn-container').style.display = 'none';
+            document.getElementById('toggle-btns').style.display = 'none';
+            document.getElementById('schedule-container').innerHTML = '';
+            document.getElementById('schedule-table-container').innerHTML = '';
+            document.getElementById('schedule-table-container').style.display = 'none';
+            document.getElementById('reset-btn').style.display = 'none';
+            document.getElementById('loading').style.display = 'none';
+            
+            hideAllErrors();
+            currentSchedule = null;
+            currentCategories = [];
+            currentMonths = [];
+            currentView = 'cards';
+        }
+
+        // Form submission
+        document.getElementById('input-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            hideAllErrors();
+            
+            try {
+                // Validate all inputs
+                const numCategories = validateInput(document.getElementById('numCategories').value, 2, 5, 'Number of Categories');
+                const totalPeople = validateInput(document.getElementById('totalPeople').value, 6, 500, 'Total People');
+                const numHouses = validateInput(document.getElementById('numHouses').value, 1, 20, 'Number of Houses');
+                
+                // Validate category names
+                const categoryNames = [];
+                for (let i = 0; i < numCategories; i++) {
+                    const input = document.getElementById(`categoryName${i}`);
+                    if (!input) {
+                        throw new Error(`Category ${i+1} name is required`);
                     }
-                });
-            };
-        };
+                    try {
+                        const name = validateCategoryName(input.value);
+                        if (categoryNames.includes(name)) {
+                            throw new Error(`Category names must be unique. "${name}" is already used.`);
+                        }
+                        categoryNames.push(name);
+                    } catch (error) {
+                        showError(`categoryName${i}`, error.message);
+                        throw error;
+                    }
+                }
+                
+                // Validate party counts
+                const partyCounts = [];
+                let totalPartySize = 0;
+                for (let i = 0; i < numCategories; i++) {
+                    const input = document.getElementById(`partyCount${i}`);
+                    if (!input) {
+                        throw new Error(`Party count for category ${i+1} is required`);
+                    }
+                    try {
+                        const count = validateInput(input.value, 1, 50, `Party count for category ${categoryNames[i]}`);
+                        partyCounts.push(count);
+                        totalPartySize += count;
+                    } catch (error) {
+                        showError(`partyCount${i}`, error.message);
+                        throw error;
+                    }
+                }
+                
+                // Validate that total party size doesn't exceed total people
+                if (totalPartySize > totalPeople) {
+                    throw new Error(`Total party size (${totalPartySize}) cannot exceed total people (${totalPeople})`);
+                }
+                
+                // Show loading
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('generate-btn').disabled = true;
+                
+                // Generate schedule with a small delay to show loading
+                setTimeout(() => {
+                    try {
+                        const people = createPeople(categoryNames, totalPeople);
+                        const houses = createHouses(numHouses);
+                        const months = MONTH_NAMES.slice(0, 12);
+                        const schedule = generateYearlySchedule(people, categoryNames, partyCounts, houses);
+                        
+                        // Store current state
+                        currentSchedule = schedule;
+                        currentCategories = categoryNames;
+                        currentMonths = months;
+                        
+                        // Hide form and show results
+                        document.getElementById('input-form').style.display = 'none';
+                        document.getElementById('loading').style.display = 'none';
+                        document.getElementById('pdf-btn-container').style.display = 'block';
+                        document.getElementById('toggle-btns').style.display = 'block';
+                        document.getElementById('reset-btn').style.display = 'inline-block';
+                        
+                        renderSchedule(schedule, categoryNames, months, 'cards');
+                        
+                    } catch (error) {
+                        document.getElementById('loading').style.display = 'none';
+                        document.getElementById('generate-btn').disabled = false;
+                        alert('Error generating schedule: ' + error.message);
+                    }
+                }, 500);
+                
+            } catch (error) {
+                // Error already handled by validation functions
+                console.error('Form validation error:', error.message);
+            }
+        });
+
+        // Event listeners
+        document.getElementById('view-cards').addEventListener('click', switchToCardsView);
+        document.getElementById('view-table').addEventListener('click', switchToTableView);
+        document.getElementById('download-pdf').addEventListener('click', generatePDF);
+        document.getElementById('reset-btn').addEventListener('click', resetForm);
     </script>
 </body>
 </html>
