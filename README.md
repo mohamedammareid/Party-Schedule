@@ -1,85 +1,53 @@
-**🎉 Party Schedule Generator README 🎉**
+# 🎉 Yearly Party Schedule Generator
 
-Welcome to the **Yearly Party Schedule Generator**, a dynamic, client-side application that randomly and fairly distributes people into monthly parties hosted in different houses. Built with HTML, TailwindCSS, and vanilla JavaScript, you’ll love how easy it is to configure categories, people counts, and houses, then generate and export your schedule!
-
----
-
-## 📝 Table of Contents
-
-1. [Features](#-features)
-2. [Usage](#-usage)
-3. [Configuration Options](#-configuration-options)
-4. [Validation & Error Handling](#-validation--error-handling)
-5. [Export & Reset](#-export--reset)
-6. [Customization](#-customization)
-7. [Security Considerations](#-security-considerations)
-8. [License](#-license)
+A fair and random event schedule generator that distributes participants into monthly events, complete with host locations and PDF export! 📅🏠
 
 ---
 
 ## 🚀 Features
 
-* **Dynamic Form**: Choose 2–5 categories, total people (6–500), and number of houses (1–20).
-* **Fair Distribution**: Round-robin algorithm ensures each person attends before repeats.
-* **Randomized Shuffle**: Fisher–Yates shuffle for true random order of both people and houses.
-* **Toggle Views**: Switch between **Cards** and **Table** displays at any time.
-* **PDF Export**: Instantly download your schedule as a printable PDF (`html2pdf.js`).
-* **Responsive Design**: TailwindCSS ensures mobile-friendly layout.
-* **Live Validation**: Instant input checks with clear error messages.
-* **Reset Capability**: Easily start over without reloading the page.
+- **Custom Categories:** Define 2–5 categories (e.g. A, B, C) for your participants.  
+- **Flexible Counts:** Set total people (6–500) and per‐event counts per category (1–50).  
+- **Randomized Hosts:** Assign 1–20 host locations in a rotating, random fashion.  
+- **Fair Distribution:** Ensures everyone meets new people each month, minimizing repeats.  
+- **Two Views:** Switch between **Card View** and **Table View** for easy browsing.  
+- **PDF Export:** Download your full yearly schedule as a neatly formatted PDF. 📄✨  
 
 ---
 
-## 📋 Usage
+## ⚙️ Usage
 
-1. Open the web page.
-2. Fill in the **Number of Categories**, **Category Names**, **Total People**, **Number of Houses**, and **Party Count per Category**.
-3. Click **Generate Schedule**.
-4. Use **View as Cards** / **View as Table** to switch layouts.
-5. Click **Download as PDF** to export.
-6. Click **Reset** to start a new configuration.
-
----
-
-## ⚙️ Configuration Options
-
-| Setting                  | Type   | Range / Default    | Description                                       |
-| ------------------------ | ------ | ------------------ | ------------------------------------------------- |
-| Number of Categories     | Number | 2–5 (default: 2)   | How many distinct groups of people.               |
-| Category Names           | String | A–Z, max 10 ch.    | Alphanumeric labels for each category.            |
-| Total Number of People   | Number | 6–500 (default:40) | Total pool of participants.                       |
-| Number of Houses         | Number | 1–20 (default:5)   | How many hosting locations.                       |
-| Party Count per Category | Number | 1–50 (default:10)  | Number of attendees from each category per month. |
-
----
-
-## ✔️ Validation & Error Handling
-
-* All inputs are validated on-the-fly.
-* Error messages appear under invalid fields.
-* Prevents empty names, duplicate categories, out-of-range numbers, and party-size > total people.
-
----
-
-## 📤 Export & Reset
-
-* **Download as PDF**: Uses **html2pdf.js** with A4 portrait layout. Exports the **Table View** for consistency.
-* **Reset**: Clears schedule, hides controls, and returns to the form without page reload.
+1. **Open** `(https://mohamedammareid.github.io/Party-Schedule/)`.
+2. **Enter**:
+   - **Number of Categories** (2–5)  
+   - **Category Names** (up to 10 characters, A–Z & 0–9)  
+   - **Total People** (6–500)  
+   - **Host Locations** (1–20)  
+   - **Per‐Event Counts** for each category (1–50)  
+3. **Click** **Generate Schedule**.  
+4. **View** your results in Cards or Table mode.  
+5. **Download PDF** to save or share.  
 
 ---
 
 ## 🎨 Customization
 
-* **Styling**: Modify TailwindCSS classes directly in the `<style>` block or extend via a custom CSS file.
-* **Locale**: Translate month names by updating the `MONTH_NAMES` array.
-* **Shuffle Algorithm**: Swap `shuffleArray` with a cryptographic RNG (e.g., `crypto.getRandomValues`).
+- **Styling:** Modify the TailwindCSS classes in `<style>` to adjust colors, spacing, or fonts.  
+- **Fonts:** Change the Google Font in the `<head>` (default: _Inter_).  
+- **Logic:** Tweak the scheduling logic in `generateYearlySchedule()` for your own fairness rules.  
 
 ---
 
-## 🔒 Security Considerations
+## 👩‍💻 How It Works
 
-* **Input Sanitization**: `sanitizeString` removes `<>'"&` to prevent basic XSS.
-* **Minimize innerHTML**: Prefer `createElement`/`textContent` for dynamic content to avoid injection.
-* **CDN Integrity**: For production, add Subresource Integrity (SRI) attributes or self-host assets.
+1. **People & Houses Creation**  
+   - Splits total people evenly into categories, assigns unique IDs (e.g. `A-001`, `B-012`).  
+   - Generates host locations (`Location-1`, `Location-2`, …).  
+2. **Shuffle & Assign**  
+   - Randomly shuffles people and houses.  
+   - For each month, picks participants by lowest participation and lowest prior meetings.  
+3. **Track & Render**  
+   - Tracks who’s met whom to minimize repeats.  
+   - Renders as responsive cards or accessible tables.  
 
 ---
